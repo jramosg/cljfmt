@@ -2402,6 +2402,13 @@
          {:align-map-columns? true}))))
 
 (deftest test-align-form-columns
+  (testing "empty bindings"
+    (is (reformats-to?
+         ["(let []"
+          "  nil)"]
+         ["(let []"
+          "  nil)"]
+         {:align-form-columns? true})))
   (testing "basic alignment"
     (is (reformats-to?
          ["(let [x 1]"
@@ -2485,6 +2492,242 @@
           "   :yyy :b})"]
          {:align-form-columns? true
           :aligned-forms {'foobar #{0}}}))))
+
+(deftest test-align-form-columns-with-comments
+  (testing "comments at end of bindings should not affect alignment"
+    (is (reformats-to?
+         ["(let [x 1   ; a comment"
+          "      longer 2]"
+          "  (+ x longer))"]
+         ["(let [x      1   ; a comment"
+          "      longer 2]"
+          "  (+ x longer))"]
+         {:align-form-columns? true})))
+  (testing "comments between bindings should not affect alignment"
+    (is (reformats-to?
+         ["(let [binding1 \"value1\""
+          "      ;; This is a comment"
+          "      binding2 \"value2\""
+          "      ;; Another comment"
+          "      longer-binding \"value3\"]"
+          "  (+ binding1 binding2))"]
+         ["(let [binding1       \"value1\""
+          "      ;; This is a comment"
+          "      binding2       \"value2\""
+          "      ;; Another comment"
+          "      longer-binding \"value3\"]"
+          "  (+ binding1 binding2))"]
+         {:align-form-columns? true}))
+    (is (reformats-to?
+         ["(let [a 1"
+          "      ;; comment"
+          "      bb 2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         ["(let [a   1"
+          "      ;; comment"
+          "      bb  2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         {:align-form-columns? true})))
+  (testing "let starting with long comment should not affect alignment"
+    (is (reformats-to?
+         ["(let [;; This is a very long comment at the beginning of the let"
+          "      a 1"
+          "      bb 2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         ["(let [;; This is a very long comment at the beginning of the let"
+          "      a   1"
+          "      bb  2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         {:align-form-columns? true}))))
+
+(deftest test-align-form-columns-edge-cases
+  (testing "for comprehension with multiple clauses"
+    (is (reformats-to?
+         ["(for [x [1 2 3]"
+          "      y [4 5 6]"
+          "      :let [sum (+ x y)]"
+          "      :when (even? sum)]"
+          "  sum)"]
+         ["(for [x     [1 2 3]"
+          "      y     [4 5 6]"
+          "      :let  [sum (+ x y)]"
+          "      :when (even? sum)]"
+          "  sum)"]
+         {:align-form-columns? true})))
+  (testing "destructuring in bindings"
+    (is (reformats-to?
+         ["(let [{:keys [a b]} {:a 1 :b 2}"
+          "      c 3]"
+          "  (+ a b c))"]
+         ["(let [{:keys [a b]} {:a 1 :b 2}"
+          "      c             3]"
+          "  (+ a b c))"]
+         {:align-form-columns? true}))
+    (is (reformats-to?
+         ["(let [[x y] [1 2]"
+          "      longer 3]"
+          "  (+ x y longer))"]
+         ["(let [[x y]  [1 2]"
+          "      longer 3]"
+          "  (+ x y longer))"]
+         {:align-form-columns? true})))
+  (testing "if-let and when-let"
+    (is (reformats-to?
+         ["(if-let [x 1]"
+          "  x"
+          "  nil)"]
+         ["(if-let [x 1]"
+          "  x"
+          "  nil)"]
+         {:align-form-columns? true}))
+    (is (reformats-to?
+         ["(when-let [longer-name 1]"
+          "  longer-name)"]
+         ["(when-let [longer-name 1]"
+          "  longer-name)"]
+         {:align-form-columns? true})))
+  (testing "loop bindings"
+    (is (reformats-to?
+         ["(loop [x 0"
+          "       counter 10]"
+          "  (if (pos? counter)"
+          "    (recur (inc x) (dec counter))"
+          "    x))"]
+         ["(loop [x       0"
+          "       counter 10]"
+          "  (if (pos? counter)"
+          "    (recur (inc x) (dec counter))"
+          "    x))"]
+         {:align-form-columns? true})))
+  (testing "doseq bindings"
+    (is (reformats-to?
+         ["(doseq [item items"
+          "        nested nested-items]"
+          "  (println item nested))"]
+         ["(doseq [item   items"
+          "        nested nested-items]"
+          "  (println item nested))"]
+         {:align-form-columns? true})))
+  (testing "binding with metadata"
+    (is (reformats-to?
+         ["(let [^String x \"hello\""
+          "      ^Long y 42]"
+          "  (+ (count x) y))"]
+         ["(let [^String x \"hello\""
+          "      ^Long y   42]"
+          "  (+ (count x) y))"]
+         {:align-form-columns? true})))
+  (testing "mixed modifiers and keywords in for"
+    (is (reformats-to?
+         ["(for [a [1 2]"
+          "      :let [b (* a 2)]"
+          "      :when (even? b)"
+          "      c [3 4]"
+          "      :while (< c 10)]"
+          "  [a b c])"]
+         ["(for [a      [1 2]"
+          "      :let   [b (* a 2)]"
+          "      :when  (even? b)"
+          "      c      [3 4]"
+          "      :while (< c 10)]"
+          "  [a b c])"]
+         {:align-form-columns? true}))))
+
+(deftest test-align-single-column-lines-option
+  (testing "map with wrapped value - :align-single-column-lines? true causes excessive padding"
+    (is (reformats-to?
+         ["{:key1 1"
+          " :key2"
+          " (fn [a b c d e]"
+          "   (+ a b c d e))"
+          " :key 3}"]
+         ["{:key1            1"
+          " :key2"
+          " (fn [a b c d e]"
+          "   (+ a b c d e))"
+          " :key             3}"]
+         {:align-map-columns?         true
+          :align-single-column-lines? true})))
+  (testing "let with wrapped value - :align-single-column-lines? true causes excessive padding"
+    (is (reformats-to?
+         ["(let [a 2"
+          "      b"
+          "      (fn [e]"
+          "        (+ e 1 1 1 1 1 1 1 1))"
+          "      c 3]"
+          "  (+ a c))"]
+         ["(let [a                        2"
+          "      b"
+          "      (fn [e]"
+          "        (+ e 1 1 1 1 1 1 1 1))"
+          "      c                        3]"
+          "  (+ a c))"]
+         {:align-form-columns?        true
+          :align-single-column-lines? true})))
+  (testing "map with wrapped value - :align-single-column-lines? false (default) compact alignment"
+    (is (reformats-to?
+         ["{:key1 1"
+          " :key2"
+          " (fn [a b c d e]"
+          "   (+ a b c d e))"
+          " :key 3}"]
+         ["{:key1 1"
+          " :key2"
+          " (fn [a b c d e]"
+          "   (+ a b c d e))"
+          " :key  3}"]
+         {:align-map-columns? true})))
+  (testing "let with wrapped value - :align-single-column-lines? false (default) compact alignment"
+    (is (reformats-to?
+         ["(let [a 2"
+          "      b"
+          "      (fn [e]"
+          "        (+ e 1 1 1 1 1 1 1 1))"
+          "      c 3]"
+          "  (+ a c))"]
+         ["(let [a 2"
+          "      b"
+          "      (fn [e]"
+          "        (+ e 1 1 1 1 1 1 1 1))"
+          "      c 3]"
+          "  (+ a c))"]
+         {:align-form-columns? true})))
+  (testing "normal alignment unaffected when all values are on same line"
+    (is (reformats-to?
+         ["{:short 1"
+          " :longer 2}"]
+         ["{:short  1"
+          " :longer 2}"]
+         {:align-map-columns? true}))
+    (is (reformats-to?
+         ["(let [x 1"
+          "      longer 2]"
+          "  (+ x longer))"]
+         ["(let [x      1"
+          "      longer 2]"
+          "  (+ x longer))"]
+         {:align-form-columns? true})))
+  (testing "multiple wrapped values still avoid excessive padding with false (default)"
+    (is (reformats-to?
+         ["{:a 1"
+          " :wrapped1"
+          " (fn [x] x)"
+          " :b 2"
+          " :wrapped2"
+          " (fn [y] y)"
+          " :c 3}"]
+         ["{:a 1"
+          " :wrapped1"
+          " (fn [x] x)"
+          " :b 2"
+          " :wrapped2"
+          " (fn [y] y)"
+          " :c 3}"]
+         {:align-map-columns? true}))))
 
 (deftest test-realign-form
   (is (= "
