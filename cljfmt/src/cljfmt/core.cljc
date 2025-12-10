@@ -701,8 +701,8 @@
       (let [at-blank-line? (has-blank-line-after? z)
             wrapped? (and (pos? col-idx) (preceded-by-linebreak? z))
             has-next-column? (has-value-on-same-line? z)
-            new-max (if (and (= col-idx col) 
-                             (not wrapped?) 
+            new-max (if (and (= col-idx col)
+                             (not wrapped?)
                              has-next-column?
                              (not (comment? z)))
                       (max max-pos (node-end-position z))
