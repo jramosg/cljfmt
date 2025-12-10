@@ -256,10 +256,12 @@ In order to load the standard configuration file from Leiningen, add the
   true if cljfmt should align the keys and values of maps such that they
   line up in columns. Defaults to false. **Experimental.**
 
-* `:blank-lines-separate-alignment?` -
-  true if cljfmt should treat blank lines as separators when aligning
-  columns. When enabled, alignment groups are separated by blank lines,
-  allowing independent alignment within each group. Defaults to false. **Experimental.**
+* `blank-lines-separate-alignment` -
+  true if cljfmt should treat blank lines as separators when aligning columns.
+  When enabled, alignment groups are separated by blank lines,
+  allowing independent alignment within each group.
+  Defaults to false.
+  **Experimental.**
 
 * `:blank-line-forms` - map of symbols that tell cljfmt which forms are allowed
   to have blank lines inside of them. The value may be either `:all`, which

@@ -2558,6 +2558,74 @@
           "      d   4]"
           "  (+ a bb ccc d))"]
          {:align-form-columns? true
+          :blank-lines-separate-alignment? false})))
+  (testing "single group with blank-lines-separate-alignment? true"
+    (is (reformats-to?
+         ["(let [a 1"
+          "      bb 2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         ["(let [a   1"
+          "      bb  2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? true}))
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          " :ccc 3}"]
+         ["{:a   1"
+          " :bb  2"
+          " :ccc 3}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true})))
+  (testing "single group with blank-lines-separate-alignment? false"
+    (is (reformats-to?
+         ["(let [a 1"
+          "      bb 2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         ["(let [a   1"
+          "      bb  2"
+          "      ccc 3]"
+          "  (+ a bb ccc))"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? false}))
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          " :ccc 3}"]
+         ["{:a   1"
+          " :bb  2"
+          " :ccc 3}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? false})))
+  (testing "empty form with blank-lines-separate-alignment? true"
+    (is (reformats-to?
+         ["(let []"
+          "  nil)"]
+         ["(let []"
+          "  nil)"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? true}))
+    (is (reformats-to?
+         ["{}"]
+         ["{}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true})))
+  (testing "empty form with blank-lines-separate-alignment? false"
+    (is (reformats-to?
+         ["(let []"
+          "  nil)"]
+         ["(let []"
+          "  nil)"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? false}))
+    (is (reformats-to?
+         ["{}"]
+         ["{}"]
+         {:align-map-columns? true
           :blank-lines-separate-alignment? false}))))
 
 (deftest test-realign-form
