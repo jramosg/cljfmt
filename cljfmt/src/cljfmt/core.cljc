@@ -763,9 +763,6 @@
   (let [alignf (align-one-column-fn blank-lines-separate-alignment?)]
     (transform form edit-all z/map? #(align-columns % alignf))))
 
-(defn- column-indexes [zloc]
-  (-> zloc z/down count-columns range rest))
-
 (defn- matching-form-index? [zloc [k indexes] context]
   (if (= :all indexes)
     (and (z/list? zloc)
