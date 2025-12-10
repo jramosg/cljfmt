@@ -2628,6 +2628,224 @@
          {:align-map-columns? true
           :blank-lines-separate-alignment? false}))))
 
+(deftest test-alignment-with-line-wrapped-values
+  (testing "map values that wrap to new line should not affect alignment"
+    (is (reformats-to?
+         ["{:short-key 1"
+          " :another-key 2"
+          " :wrapped-value"
+          " (fn [x]"
+          "   (+ x 1))"
+          " :last-key 3}"]
+         ["{:short-key   1"
+          " :another-key 2"
+          " :wrapped-value"
+          " (fn [x]"
+          "   (+ x 1))"
+          " :last-key    3}"]
+         {:align-map-columns? true}))
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          " :multi-line"
+          " {:nested 3}"
+          " :c 4}"]
+         ["{:a  1"
+          " :bb 2"
+          " :multi-line"
+          " {:nested 3}"
+          " :c  4}"]
+         {:align-map-columns? true}))))
+
+(deftest test-alignment-with-comments
+  (testing "comments between map entries should not affect alignment"
+    (is (reformats-to?
+         ["{:key1 \"value1\""
+          " ;; This is a comment"
+          " :key2 \"value2\""
+          " ;; Another comment"
+          " :longer-key \"value3\"}"]
+         ["{:key1       \"value1\""
+          " ;; This is a comment"
+          " :key2       \"value2\""
+          " ;; Another comment"
+          " :longer-key \"value3\"}"]
+         {:align-map-columns? true}))
+    (is (reformats-to?
+         ["{:a 1"
+          " ;; comment"
+          " :bb 2"
+          " :ccc 3}"]
+         ["{:a   1"
+          " ;; comment"
+          " :bb  2"
+          " :ccc 3}"]
+         {:align-map-columns? true}))))
+
+(deftest test-alignment-with-wrapped-values-edge-cases
+  (testing "wrapped fn with very long key name"
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          " :very-long-key-name-that-might-wrap"
+          " (fn [x y z]"
+          "   (+ x y z))"
+          " :c 3}"]
+         ["{:a  1"
+          " :bb 2"
+          " :very-long-key-name-that-might-wrap"
+          " (fn [x y z]"
+          "   (+ x y z))"
+          " :c  3}"]
+         {:align-map-columns? true})))
+  (testing "wrapped fn with short key but long fn body"
+    (is (reformats-to?
+         ["{:short 1"
+          " :x"
+          " (fn [arg]"
+          "   (let [result (very-long-function-call arg)]"
+          "     (process result)))"
+          " :another-key 2}"]
+         ["{:short       1"
+          " :x"
+          " (fn [arg]"
+          "   (let [result (very-long-function-call arg)]"
+          "     (process result)))"
+          " :another-key 2}"]
+         {:align-map-columns? true})))
+  (testing "nested map with wrapped value in outer map"
+    (is (reformats-to?
+         ["{:outer-key 1"
+          " :wrapped"
+          " {:nested-a 10"
+          "  :nested-b 20}"
+          " :last 2}"]
+         ["{:outer-key 1"
+          " :wrapped"
+          " {:nested-a 10"
+          "  :nested-b 20}"
+          " :last      2}"]
+         {:align-map-columns? true})))
+  (testing "nested map with alignment in both outer and inner maps"
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb {:inner-x 100"
+          "      :inner-y 200}"
+          " :ccc 3}"]
+         ["{:a   1"
+          " :bb  {:inner-x 100"
+          "       :inner-y 200}"
+          " :ccc 3}"]
+         {:align-map-columns? true})))
+  (testing "wrapped value with very short keys"
+    (is (reformats-to?
+         ["{:a 1"
+          " :b"
+          " (fn [] (do-something-complex))"
+          " :c 3}"]
+         ["{:a 1"
+          " :b"
+          " (fn [] (do-something-complex))"
+          " :c 3}"]
+         {:align-map-columns? true})))
+  (testing "multiple consecutive wrapped values"
+    (is (reformats-to?
+         ["{:key1 1"
+          " :wrapped1"
+          " (fn [x] x)"
+          " :wrapped2"
+          " (fn [y] y)"
+          " :key2 2}"]
+         ["{:key1 1"
+          " :wrapped1"
+          " (fn [x] x)"
+          " :wrapped2"
+          " (fn [y] y)"
+          " :key2 2}"]
+         {:align-map-columns? true})))
+  (testing "wrapped vector value"
+    (is (reformats-to?
+         ["{:short 1"
+          " :longer 2"
+          " :wrapped"
+          " [:a :b :c"
+          "  :d :e :f]"
+          " :last 3}"]
+         ["{:short  1"
+          " :longer 2"
+          " :wrapped"
+          " [:a :b :c"
+          "  :d :e :f]"
+          " :last   3}"]
+         {:align-map-columns? true})))
+  (testing "wrapped value at the beginning"
+    (is (reformats-to?
+         ["{:wrapped"
+          " (fn [x] (inc x))"
+          " :a 1"
+          " :bb 2}"]
+         ["{:wrapped"
+          " (fn [x] (inc x))"
+          " :a  1"
+          " :bb 2}"]
+         {:align-map-columns? true})))
+  (testing "wrapped value at the end"
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          " :wrapped"
+          " (fn [x] (inc x))}"]
+         ["{:a  1"
+          " :bb 2"
+          " :wrapped"
+          " (fn [x] (inc x))}"]
+         {:align-map-columns? true})))
+  (testing "only wrapped values no inline values"
+    (is (reformats-to?
+         ["{:wrapped1"
+          " (fn [x] x)"
+          " :wrapped2"
+          " (fn [y] y)}"]
+         ["{:wrapped1"
+          " (fn [x] x)"
+          " :wrapped2"
+          " (fn [y] y)}"]
+         {:align-map-columns? true})))
+  (testing "deeply nested map with wrapped values at multiple levels"
+    (is (reformats-to?
+         ["{:a 1"
+          " :outer"
+          " {:inner-a 10"
+          "  :inner-wrapped"
+          "  (fn [x] x)"
+          "  :inner-b 20}"
+          " :b 2}"]
+         ["{:a 1"
+          " :outer"
+          " {:inner-a 10"
+          "  :inner-wrapped"
+          "  (fn [x] x)"
+          "  :inner-b 20}"
+          " :b 2}"]
+         {:align-map-columns? true})))
+  (testing "wrapped value with complex nested structure"
+    (is (reformats-to?
+         ["{:config {:host \"localhost\""
+          "         :port 8080}"
+          " :handler"
+          " (fn [req]"
+          "   {:status 200"
+          "    :body \"ok\"})"
+          " :name \"app\"}"]
+         ["{:config {:host \"localhost\""
+          "          :port 8080}"
+          " :handler"
+          " (fn [req]"
+          "   {:status 200"
+          "    :body   \"ok\"})"
+          " :name   \"app\"}"]
+         {:align-map-columns? true}))))
+
 (deftest test-realign-form
   (is (= "
 {:x   1

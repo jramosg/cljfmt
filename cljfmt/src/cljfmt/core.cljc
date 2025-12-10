@@ -599,6 +599,14 @@
 (defn- skip-to-linebreak-or-element [zloc]
   (z/skip z/right* (some-fn space? comma?) zloc))
 
+(defn- preceded-by-linebreak? [zloc]
+  (loop [z (z/left* zloc)]
+    (cond
+      (nil? z) false
+      (line-break? z) true
+      (or (space? z) (comma? z)) (recur (z/left* z))
+      :else false)))
+
 (defn- reduce-columns [zloc f init]
   (loop [zloc zloc, col 0, acc init]
     (if-some [zloc (skip-to-linebreak-or-element zloc)]
@@ -624,12 +632,18 @@
                      (map count))
                max 0 (str/split lines #"\r?\n"))))
 
+(defn- has-value-on-same-line? [zloc]
+  (when-some [next-elem (skip-to-linebreak-or-element (z/right* zloc))]
+    (not (line-break? next-elem))))
+
 (defn- max-column-end-position [zloc col]
   (reduce-columns zloc
                   (fn [zloc c max-pos]
-                    (if (= c col)
-                      (max max-pos (node-end-position zloc))
-                      max-pos))
+                    (let [wrapped? (and (pos? c) (preceded-by-linebreak? zloc))
+                          has-next-column? (has-value-on-same-line? zloc)]
+                      (if (and (= c col) (not wrapped?) has-next-column?)
+                        (max max-pos (node-end-position zloc))
+                        max-pos)))
                   0))
 
 (defn- node-str-length [zloc]
@@ -667,7 +681,8 @@
 (defn- edit-column [zloc column f]
   (loop [zloc zloc, col 0]
     (if-some [zloc (skip-to-linebreak-or-element zloc)]
-      (let [zloc (if (and (= col column) (not (line-break? zloc)))
+      (let [wrapped? (and (pos? col) (preceded-by-linebreak? zloc))
+            zloc (if (and (= col column) (not (line-break? zloc)) (not wrapped?))
                    (f zloc)
                    zloc)
             col  (if (line-break? zloc) 0 (inc col))]
@@ -684,7 +699,9 @@
   (loop [z zloc, max-pos 0, col-idx 0]
     (if-some [z (skip-to-linebreak-or-element z)]
       (let [at-blank-line? (has-blank-line-after? z)
-            new-max (if (= col-idx col)
+            wrapped? (and (pos? col-idx) (preceded-by-linebreak? z))
+            has-next-column? (has-value-on-same-line? z)
+            new-max (if (and (= col-idx col) (not wrapped?) has-next-column?)
                       (max max-pos (node-end-position z))
                       max-pos)
             next-col (if (line-break? z) 0 (inc col-idx))]
@@ -697,7 +714,8 @@
   (loop [z zloc, col-idx 0]
     (if-some [z (skip-to-linebreak-or-element z)]
       (let [at-blank-line? (has-blank-line-after? z)
-            z (if (and (= col-idx col) (not (line-break? z)))
+            wrapped? (and (pos? col-idx) (preceded-by-linebreak? z))
+            z (if (and (= col-idx col) (not (line-break? z)) (not wrapped?))
                 (pad-to-position z start-position)
                 z)
             next-col (if (line-break? z) 0 (inc col-idx))]
