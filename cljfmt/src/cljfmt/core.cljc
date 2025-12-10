@@ -372,6 +372,7 @@
    :align-map-columns?                    false
    :aligned-forms                         default-aligned-forms
    :blank-line-forms                      blank-line-forms
+   :blank-lines-separate-alignment?       false
    :extra-aligned-forms                   {}
    :extra-blank-line-forms                {}
    :extra-indents                         {}
@@ -675,17 +676,75 @@
           zloc))
       zloc)))
 
+(defn- has-blank-line-after? [zloc]
+  (when (line-break? zloc)
+    (> (count-newlines zloc) 1)))
+
+(defn- align-one-column-with-groups [zloc col]
+  (if-some [child-zloc (z/down zloc)]
+    (loop [_ child-zloc
+           group-start-zloc child-zloc]
+      (let [;; Find max position in current group
+            max-pos (loop [z group-start-zloc, max-p 0, col-idx 0]
+                      (if-some [z (skip-to-linebreak-or-element z)]
+                        (let [at-blank-line? (has-blank-line-after? z)
+                              new-max (if (= col-idx (dec col))
+                                        (max max-p (node-end-position z))
+                                        max-p)
+                              next-col (if (line-break? z) 0 (inc col-idx))]
+                          (if (or at-blank-line? (nil? (z/right* z)))
+                            new-max
+                            (recur (z/right* z) new-max next-col)))
+                        max-p))
+            ;; Apply alignment to current group
+            start-position (inc max-pos)
+            zloc-after (loop [z group-start-zloc, col-idx 0]
+                         (if-some [z (skip-to-linebreak-or-element z)]
+                           (let [at-blank-line? (has-blank-line-after? z)
+                                 z (if (and (= col-idx col) (not (line-break? z)))
+                                     (pad-to-position z start-position)
+                                     z)
+                                 next-col (if (line-break? z) 0 (inc col-idx))]
+                             (if at-blank-line?
+                               z
+                               (if-some [zn (z/right* z)]
+                                 (recur zn next-col)
+                                 z)))
+                           z))]
+        ;; Find next group start (after blank line)
+        (if-let [next-group (loop [z zloc-after]
+                              (when-some [z (skip-to-linebreak-or-element z)]
+                                (if (has-blank-line-after? z)
+                                  (z/right* z)
+                                  (recur (z/right* z)))))]
+          (recur zloc-after next-group)
+          (z/up zloc-after))))
+    zloc))
+
 (defn- align-one-column [zloc col]
   (if-some [zloc (z/down zloc)]
     (let [start-position (inc (max-column-end-position zloc (dec col)))]
       (z/up (edit-column zloc col #(pad-to-position % start-position))))
     zloc))
 
-(defn- align-columns [zloc]
-  (reduce align-one-column zloc (-> zloc z/down count-columns range rest)))
+(defn- column-indexes [zloc]
+  (-> zloc z/down count-columns range rest))
 
-(defn align-map-columns [form]
-  (transform form edit-all z/map? align-columns))
+(defn- align-columns
+  ([zloc] (align-columns zloc false))
+  ([zloc blank-lines-separate-alignment?]
+   (if blank-lines-separate-alignment?
+     (reduce (fn [zloc col]
+               (align-one-column-with-groups zloc col))
+             zloc
+             (column-indexes zloc))
+     (reduce (fn [zloc col]
+               (align-one-column zloc col))
+             zloc
+             (column-indexes zloc)))))
+
+(defn align-map-columns [form blank-lines-separate-alignment?]
+  (transform form edit-all z/map? #(align-columns % blank-lines-separate-alignment?)))
 
 (defn- matching-form-index? [zloc [k indexes] context]
   (if (= :all indexes)
@@ -699,11 +758,11 @@
   (and (or (z/list? zloc) (z/list? (z/up zloc)))
        (some #(matching-form-index? zloc % context) form-indexes)))
 
-(defn align-form-columns [form aligned-forms alias-map]
+(defn align-form-columns [form aligned-forms alias-map blank-lines-separate-alignment?]
   (let [ns-name  (find-namespace (z/of-node form))
         context  {:alias-map alias-map, :ns-name ns-name}
         aligned? #(matching-form? % aligned-forms context)]
-    (transform form edit-all aligned? align-columns)))
+    (transform form edit-all aligned? #(align-columns % blank-lines-separate-alignment?))))
 
 (defn realign-form
   "Realign a rewrite-clj form such that the columns line up into columns."
@@ -811,9 +870,9 @@
          (cond-> (:indentation? opts)
            (reindent indents alias-map opts))
          (cond-> (:align-map-columns? opts)
-           align-map-columns)
+           (align-map-columns (:blank-lines-separate-alignment? opts)))
          (cond-> (:align-form-columns? opts)
-           (align-form-columns aligned alias-map))
+           (align-form-columns aligned alias-map (:blank-lines-separate-alignment? opts)))
          (cond-> (:remove-trailing-whitespace? opts)
            remove-trailing-whitespace)
          (cond-> (:remove-blank-lines-in-forms? opts)

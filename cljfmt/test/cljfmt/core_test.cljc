@@ -2486,6 +2486,80 @@
          {:align-form-columns? true
           :aligned-forms {'foobar #{0}}}))))
 
+(deftest test-blank-lines-separate-alignment
+  (testing "let bindings with blank line separation"
+    (is (reformats-to?
+         ["(let [short-var                                        true"
+          "      much-longer-var-name-that-should-force-alignment true"
+          ""
+          "      some-map                                         {:a            1"
+          "                                                        :alphabetical 2}]"
+          "  ...)"]
+         ["(let [short-var                                        true"
+          "      much-longer-var-name-that-should-force-alignment true"
+          ""
+          "      some-map {:a            1"
+          "                :alphabetical 2}]"
+          "  ...)"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? true}))
+    (is (reformats-to?
+         ["(let [a 1"
+          "      bb 2"
+          ""
+          "      ccc 3"
+          "      d 4]"
+          "  (+ a bb ccc d))"]
+         ["(let [a  1"
+          "      bb 2"
+          ""
+          "      ccc 3"
+          "      d   4]"
+          "  (+ a bb ccc d))"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? true})))
+  (testing "maps with blank line separation"
+    (is (reformats-to?
+         ["{:x 1"
+          " :longer 2"
+          ""
+          " :another-key 3"
+          " :y 4}"]
+         ["{:x      1"
+          " :longer 2"
+          ""
+          " :another-key 3"
+          " :y           4}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true}))
+    (is (reformats-to?
+         ["{:a 1"
+          " :bb 2"
+          ""
+          " :ccc 3}"]
+         ["{:a  1"
+          " :bb 2"
+          ""
+          " :ccc 3}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true})))
+  (testing "alignment without blank line separation (default behavior)"
+    (is (reformats-to?
+         ["(let [a 1"
+          "      bb 2"
+          ""
+          "      ccc 3"
+          "      d 4]"
+          "  (+ a bb ccc d))"]
+         ["(let [a   1"
+          "      bb  2"
+          ""
+          "      ccc 3"
+          "      d   4]"
+          "  (+ a bb ccc d))"]
+         {:align-form-columns? true
+          :blank-lines-separate-alignment? false}))))
+
 (deftest test-realign-form
   (is (= "
 {:x   1
