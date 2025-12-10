@@ -2713,7 +2713,41 @@
           " :a   1"
           " :bb  2"
           " :ccc 3}"]
-         {:align-map-columns? true}))))
+         {:align-map-columns? true})))
+  (testing "comment with blank line causes alignment across entire map by default"
+    (is (reformats-to?
+         ["{:_test :ok"
+          ""
+          " ;; this is a very long comment that is too long"
+          " :align-binding-columns? true}"]
+         ["{:_test                  :ok"
+          ""
+          " ;; this is a very long comment that is too long"
+          " :align-binding-columns? true}"]
+         {:align-map-columns? true})))
+  (testing "blank-lines-separate-alignment separates groups at blank lines"
+    (is (reformats-to?
+         ["{:_test :ok"
+          ""
+          " ;; comment"
+          " :align-binding-columns? true}"]
+         ["{:_test :ok"
+          ""
+          " ;; comment"
+          " :align-binding-columns? true}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true}))
+    (is (reformats-to?
+         ["{:_test :ok"
+          ""
+          " ;; comment very long that is too long"
+          " :align-binding-columns? true}"]
+         ["{:_test :ok"
+          ""
+          " ;; comment very long that is too long"
+          " :align-binding-columns? true}"]
+         {:align-map-columns? true
+          :blank-lines-separate-alignment? true}))))
 
 (deftest test-alignment-with-wrapped-values-edge-cases
   (testing "wrapped fn with very long key name"

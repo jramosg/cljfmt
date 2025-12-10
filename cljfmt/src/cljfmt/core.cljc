@@ -641,7 +641,7 @@
                   (fn [zloc c max-pos]
                     (let [wrapped? (and (pos? c) (preceded-by-linebreak? zloc))
                           has-next-column? (has-value-on-same-line? zloc)]
-                      (if (and (= c col) (not wrapped?) has-next-column?)
+                      (if (and (= c col) (not wrapped?) has-next-column? (not (comment? zloc)))
                         (max max-pos (node-end-position zloc))
                         max-pos)))
                   0))
@@ -701,7 +701,10 @@
       (let [at-blank-line? (has-blank-line-after? z)
             wrapped? (and (pos? col-idx) (preceded-by-linebreak? z))
             has-next-column? (has-value-on-same-line? z)
-            new-max (if (and (= col-idx col) (not wrapped?) has-next-column?)
+            new-max (if (and (= col-idx col) 
+                             (not wrapped?) 
+                             has-next-column?
+                             (not (comment? z)))
                       (max max-pos (node-end-position z))
                       max-pos)
             next-col (if (line-break? z) 0 (inc col-idx))]
