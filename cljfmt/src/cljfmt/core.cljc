@@ -636,16 +636,6 @@
   (when-some [next-elem (skip-to-linebreak-or-element (z/right* zloc))]
     (not (line-break? next-elem))))
 
-(defn- max-column-end-position [zloc col]
-  (reduce-columns zloc
-                  (fn [zloc c max-pos]
-                    (let [wrapped? (and (pos? c) (preceded-by-linebreak? zloc))
-                          has-next-column? (has-value-on-same-line? zloc)]
-                      (if (and (= c col) (not wrapped?) has-next-column? (not (comment? zloc)))
-                        (max max-pos (node-end-position zloc))
-                        max-pos)))
-                  0))
-
 (defn- node-str-length [zloc]
   (-> zloc z/node n/string count))
 
@@ -695,23 +685,45 @@
   (when (line-break? zloc)
     (> (count-newlines zloc) 1)))
 
+(defn- end-of-column-group? [zloc]
+  (or (nil? zloc)
+      (has-blank-line-after? zloc)))
+
+(defn- find-start-of-column-group [zloc]
+  (loop [z zloc]
+    (let [prev (when z (z/left* z))]
+      (if (or (nil? prev) (has-blank-line-after? prev))
+        z
+        (recur prev)))))
+
+(defn- reduce-column-group [zloc f init]
+  (loop [zloc (find-start-of-column-group zloc)
+         col 0
+         acc init]
+    (if-some [zloc (skip-to-linebreak-or-element zloc)]
+      (if (end-of-column-group? zloc)
+        acc
+        (if (line-break? zloc)
+          (recur (z/right* zloc) 0 acc)
+          (recur (z/right* zloc) (inc col) (f zloc col acc))))
+      acc)))
+
+(defn- column-end-maximizer [col]
+  (fn [zloc c max-pos]
+    (let [wrapped? (and (pos? c) (preceded-by-linebreak? zloc))
+          has-next-column? (has-value-on-same-line? zloc)]
+      (if (and (= c col)
+               (not wrapped?)
+               has-next-column?
+               (not (comment? zloc)))
+        (max max-pos (node-end-position zloc))
+        max-pos))))
+
+(defn- max-column-end-position [zloc col]
+  (reduce-columns zloc (column-end-maximizer col) 0))
+
 (defn- max-column-group-end-position [zloc col]
-  (loop [z zloc, max-pos 0, col-idx 0]
-    (if-some [z (skip-to-linebreak-or-element z)]
-      (let [at-blank-line? (has-blank-line-after? z)
-            wrapped? (and (pos? col-idx) (preceded-by-linebreak? z))
-            has-next-column? (has-value-on-same-line? z)
-            new-max (if (and (= col-idx col)
-                             (not wrapped?)
-                             has-next-column?
-                             (not (comment? z)))
-                      (max max-pos (node-end-position z))
-                      max-pos)
-            next-col (if (line-break? z) 0 (inc col-idx))]
-        (if (or at-blank-line? (nil? (z/right* z)))
-          new-max
-          (recur (z/right* z) new-max next-col)))
-      max-pos)))
+  (reduce-column-group zloc (column-end-maximizer col) 0))
 
 (defn- align-group-column [zloc col start-position]
   (loop [z zloc, col-idx 0]
