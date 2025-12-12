@@ -632,24 +632,22 @@
                      (map count))
                max 0 (str/split lines #"\r?\n"))))
 
-(defn- has-value-on-same-line? [zloc]
+(defn- single-column-line? [zloc]
   (when-some [next-elem (skip-to-linebreak-or-element (z/right* zloc))]
-    (not (line-break? next-elem))))
-
-(defn- column-end-maximizer [col align-single-column-lines?]
-  (fn [zloc c max-pos]
-    (let [wrapped? (and (pos? c) (preceded-by-linebreak? zloc))
-          has-next-column? (has-value-on-same-line? zloc)]
-      (if (and (= c col)
-               (not wrapped?)
-               (or align-single-column-lines?
-                   has-next-column?)
-               (not (comment? zloc)))
-        (max max-pos (node-end-position zloc))
-        max-pos))))
+    (line-break? next-elem)))
 
 (defn- max-column-end-position [zloc col align-single-column-lines?]
-  (reduce-columns zloc (column-end-maximizer col align-single-column-lines?) 0))
+  (reduce-columns zloc
+                  (fn [zloc c max-pos]
+                    (letfn [(wrapped? []
+                              (and (pos? c) (preceded-by-linebreak? zloc)))]
+                      (if (and (= c col)
+                               (not (wrapped?))
+                               (or align-single-column-lines?
+                                   (not (single-column-line? zloc))))
+                        (max max-pos (node-end-position zloc))
+                        max-pos)))
+                  0))
 
 (defn- node-str-length [zloc]
   (-> zloc z/node n/string count))
