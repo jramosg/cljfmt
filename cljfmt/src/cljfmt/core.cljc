@@ -145,7 +145,7 @@
         (z/insert-left* (n/newlines (if (comment? zloc-elem-before) 1 2))))))
 
 (defn remove-consecutive-blank-lines [form]
-  (transform form edit-all 
+  (transform form edit-all
              consecutive-blank-line?
              replace-consecutive-blank-lines))
 
@@ -686,10 +686,7 @@
 (defn- edit-column [zloc column f]
   (loop [zloc zloc, col 0]
     (if-some [zloc (skip-to-linebreak-or-element zloc)]
-      (let [wrapped? (and (pos? col) (preceded-by-linebreak? zloc))
-            zloc (if (and (= col column)
-                          (not (line-break? zloc))
-                          (not wrapped?))
+      (let [zloc (if (and (= col column) (not (line-break? zloc)))
                    (f zloc)
                    zloc)
             col  (if (line-break? zloc) 0 (inc col))]
@@ -701,9 +698,9 @@
 (defn- align-one-column [zloc col align-single-column-lines?]
   (if-some [down-zloc (z/down zloc)]
     (let [start-position (inc (max-column-end-position
-                                down-zloc
-                                (dec col)
-                                align-single-column-lines?))]
+                               down-zloc
+                               (dec col)
+                               align-single-column-lines?))]
       (z/up (edit-column down-zloc col #(pad-to-position % start-position))))
     zloc))
 
@@ -718,7 +715,7 @@
   ([form]
    (align-map-columns form default-options))
   ([form {:keys [align-single-column-lines?]}]
-   (transform form 
+   (transform form
               edit-all
               z/map?
               #(align-columns % align-single-column-lines?))))
@@ -742,8 +739,8 @@
    (let [ns-name (find-namespace (z/of-node form))
          context {:alias-map alias-map, :ns-name ns-name}
          aligned? #(matching-form? % aligned-forms context)]
-     (transform form 
-                edit-all 
+     (transform form
+                edit-all
                 aligned?
                 #(align-columns % align-single-column-lines?)))))
 
