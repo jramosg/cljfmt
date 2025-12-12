@@ -145,7 +145,8 @@
         (z/insert-left* (n/newlines (if (comment? zloc-elem-before) 1 2))))))
 
 (defn remove-consecutive-blank-lines [form]
-  (transform form edit-all
+  (transform form
+             edit-all
              consecutive-blank-line?
              replace-consecutive-blank-lines))
 
