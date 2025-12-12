@@ -602,14 +602,6 @@
 (defn- skip-to-linebreak-or-element [zloc]
   (z/skip z/right* (some-fn space? comma?) zloc))
 
-(defn- preceded-by-linebreak? [zloc]
-  (loop [z (z/left* zloc)]
-    (cond
-      (nil? z) false
-      (line-break? z) true
-      (or (space? z) (comma? z)) (recur (z/left* z))
-      :else false)))
-
 (defn- reduce-columns [zloc f init]
   (loop [zloc zloc, col 0, acc init]
     (if-some [zloc (skip-to-linebreak-or-element zloc)]
@@ -636,20 +628,21 @@
                max 0 (str/split lines #"\r?\n"))))
 
 (defn- single-column-line? [zloc]
-  (when-some [next-elem (skip-to-linebreak-or-element (z/right* zloc))]
-    (line-break? next-elem)))
+  (and (some->> (z/right* zloc)
+                skip-to-linebreak-or-element
+                line-break?)
+       (some->> (z/left* zloc)
+                (z/skip z/left* (some-fn space? comma?))
+                line-break?)))
 
 (defn- max-column-end-position [zloc col align-single-column-lines?]
   (reduce-columns zloc
                   (fn [zloc c max-pos]
-                    (letfn [(wrapped? []
-                              (and (pos? c) (preceded-by-linebreak? zloc)))]
-                      (if (and (= c col)
-                               (not (wrapped?))
-                               (or align-single-column-lines?
-                                   (not (single-column-line? zloc))))
-                        (max max-pos (node-end-position zloc))
-                        max-pos)))
+                    (if (and (= c col)
+                             (or align-single-column-lines?
+                                 (not (single-column-line? zloc))))
+                      (max max-pos (node-end-position zloc))
+                      max-pos))
                   0))
 
 (defn- node-str-length [zloc]
@@ -687,7 +680,7 @@
 (defn- edit-column [zloc column f]
   (loop [zloc zloc, col 0]
     (if-some [zloc (skip-to-linebreak-or-element zloc)]
-      (let [zloc (if (and (= col column) (not (line-break? zloc)))
+      (let [zloc (if (= col column)
                    (f zloc)
                    zloc)
             col  (if (line-break? zloc) 0 (inc col))]
