@@ -2727,7 +2727,27 @@
           " :wrapped2"
           " (fn [y] y)"
           " :c 3}"]
-         {:align-map-columns? true}))))
+         {:align-map-columns? true})))
+  (testing "edge case: multiple keys on same line with wrapped value after"
+    (is (reformats-to?
+         ["{:key1 1 :key2"
+          " (fn [x] x)"
+          " :key3 3}"]
+         ["{:key1 1 :key2"
+          " (fn [x] x)"
+          " :key3 3}"]
+         {:align-map-columns? true})))
+  (testing "edge case: let with multiple bindings on same line"
+    (is (reformats-to?
+         ["(let [a 1 b"
+          "      (fn [x] x)"
+          "      c 3]"
+          "  (+ a c))"]
+         ["(let [a 1 b"
+          "      (fn [x] x)"
+          "      c 3]"
+          "  (+ a c))"]
+         {:align-form-columns? true}))))
 
 (deftest test-realign-form
   (is (= "
